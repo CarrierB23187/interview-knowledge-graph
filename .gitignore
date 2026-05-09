@@ -1,0 +1,21 @@
+# 原始文档（不宜公开）
+八股/
+
+# 中间文件（体积大，非必要）
+docs/parsed_docs.json
+docs/extracted_knowledge.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# IDE / Claude
+.claude/
+.vscode/
+.playwright-mcp/
+
+# OS
+.DS_Store
+Thumbs.db

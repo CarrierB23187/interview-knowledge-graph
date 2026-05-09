@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>面试知识点图谱</title>
+
+<!-- Markmap (Mind Map) -->
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="https://cdn.jsdelivr.net/npm/markmap-lib"></script>
+<script src="https://cdn.jsdelivr.net/npm/markmap-view"></script>
+
+<!-- Vis.js (Knowledge Graph) -->
+<script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/styles/vis-network.min.css" rel="stylesheet">
+
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f8f9fa;
+  --panel-bg: #ffffff;
+  --border: #e0e0e0;
+  --text: #333;
+  --text-secondary: #666;
+  --accent: #4a90d9;
+  --accent-hover: #357abd;
+  --tag-bg: #e8f4fd;
+  --tag-text: #2a6496;
+  --header-height: 52px;
+  --detail-height: 200px;
+  --danger: #e74c3c;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Header */
+.header {
+  height: var(--header-height);
+  background: var(--panel-bg);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 16px;
+  flex-shrink: 0;
+  z-index: 10;
+}
+.header h1 {
+  font-size: 18px;
+  font-weight: 700;
+  white-space: nowrap;
+  background: linear-gradient(135deg, #4a90d9, #7b68ee);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.search-box {
+  flex: 1;
+  max-width: 400px;
+  position: relative;
+}
+.search-box input {
+  width: 100%;
+  padding: 8px 12px 8px 36px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.search-box input:focus { border-color: var(--accent); }
+.search-box .search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #999;
+  font-size: 14px;
+}
+.stats {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.stats span { font-weight: 600; color: var(--text); }
+
+/* Legend */
+.legend {
+  display: flex;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.legend-item { display: flex; align-items: center; gap: 4px; }
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Main content area */
+.main {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* Panel styles */
+.panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-bg);
+}
+.panel-header {
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.panel-content {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+}
+
+/* Left panel - Mind Map */
+.panel-left {
+  width: 38%;
+  min-width: 300px;
+  border-right: 1px solid var(--border);
+}
+#mindmap {
+  width: 100%;
+  height: 100%;
+}
+
+/* Resizer */
+.resizer {
+  width: 5px;
+  cursor: col-resize;
+  background: transparent;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 5;
+}
+.resizer:hover, .resizer.active { background: var(--accent); }
+
+/* Right panel - Knowledge Graph */
+.panel-right {
+  flex: 1;
+  min-width: 400px;
+}
+#graph {
+  width: 100%;
+  height: 100%;
+}
+
+/* Bottom panel - Detail */
+.detail-panel {
+  height: var(--detail-height);
+  background: var(--panel-bg);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  overflow-y: auto;
+  padding: 16px 20px;
+  display: flex;
+  gap: 20px;
+  transition: height 0.3s;
+}
+.detail-panel.collapsed { height: 0; padding: 0; overflow: hidden; border-top: none; }
+.detail-empty {
+  color: #aaa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  font-size: 14px;
+}
+.detail-content { flex: 1; }
+.detail-content h3 {
+  font-size: 18px;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+.detail-content .summary {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+.detail-content .meta {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: #999;
+  flex-wrap: wrap;
+}
+.detail-content .meta strong { color: var(--text-secondary); }
+.detail-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.detail-tag {
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  background: var(--tag-bg);
+  color: var(--tag-text);
+}
+.detail-relations {
+  width: 280px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  padding-left: 20px;
+}
+.detail-relations h4 {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+.relation-item {
+  font-size: 13px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.15s;
+}
+.relation-item:hover { color: var(--accent); }
+.relation-type {
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.rel-prerequisite { background: #fff3cd; color: #856404; }
+.rel-contains { background: #d4edda; color: #155724; }
+.rel-related { background: #d6e4f0; color: #2a6496; }
+.rel-compare { background: #f8d7da; color: #721c24; }
+
+/* Importance stars */
+.importance { color: #f0ad4e; letter-spacing: 2px; }
+
+/* Toggle detail button */
+.detail-toggle {
+  position: absolute;
+  top: -28px;
+  right: 12px;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+
+/* Loading */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(255,255,255,0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  font-size: 16px;
+  color: var(--text-secondary);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .main { flex-direction: column; }
+  .panel-left { width: 100%; height: 45%; border-right: none; border-bottom: 1px solid var(--border); }
+  .panel-right { height: 55%; }
+  .resizer { display: none; }
+}
+
+/* Tooltip for graph nodes */
+.vis-tooltip {
+  position: absolute;
+  background: rgba(0,0,0,0.85);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  pointer-events: none;
+  z-index: 1000;
+  max-width: 260px;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>📚 面试知识点图谱</h1>
+  <div class="search-box">
+    <span class="search-icon">🔍</span>
+    <input type="text" id="searchInput" placeholder="搜索知识点..." autocomplete="off">
+  </div>
+  <div class="legend">
+    <div class="legend-item"><span class="legend-dot" style="background:#4a90d9"></span> 前置</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#27ae60"></span> 包含</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#8e44ad"></span> 相关</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#e74c3c"></span> 对比</div>
+  </div>
+  <div class="stats">
+    知识点: <span id="nodeCount">0</span> &nbsp; 关联: <span id="edgeCount">0</span>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Left: Mind Map -->
+  <div class="panel panel-left" id="leftPanel">
+    <div class="panel-header">🧠 思维导图</div>
+    <div class="panel-content" id="mindmap"></div>
+  </div>
+
+  <!-- Resizer -->
+  <div class="resizer" id="resizer"></div>
+
+  <!-- Right: Knowledge Graph -->
+  <div class="panel panel-right">
+    <div class="panel-header">🕸️ 知识图谱</div>
+    <div class="panel-content" id="graph"></div>
+  </div>
+</div>
+
+<!-- Bottom: Detail Panel -->
+<div class="detail-panel collapsed" id="detailPanel">
+  <div class="detail-content" id="detailContent">
+    <div class="detail-empty">👆 点击思维导图或知识图谱中的节点查看详情</div>
+  </div>
+  <div class="detail-relations" id="detailRelations"></div>
+</div>
+
+<script>
+// ========== Data Loading ==========
+let graphData = { nodes: [], edges: [] };
+let network = null;
+let nodeMap = {};   // id → node
+let edgeList = [];  // all edges
+
+async function loadData() {
+  try {
+    const resp = await fetch('knowledge-data.json');
+    graphData = await resp.json();
+  } catch (e) {
+    // Fallback: try relative path
+    try {
+      const resp = await fetch('../output/knowledge-data.json');
+      graphData = await resp.json();
+    } catch (e2) {
+      console.error('Failed to load knowledge-data.json');
+      graphData = { nodes: [], edges: [] };
+    }
+  }
+
+  // Build lookup maps
+  nodeMap = {};
+  for (const n of graphData.nodes) {
+    nodeMap[n.id] = n;
+  }
+  edgeList = graphData.edges || [];
+
+  document.getElementById('nodeCount').textContent = graphData.nodes.length;
+  document.getElementById('edgeCount').textContent = edgeList.length;
+
+  // Initialize both views
+  renderMindMap();
+  renderGraph();
+}
+
+// ========== Mind Map (Markmap) ==========
+function buildMarkdownTree() {
+  const nodes = graphData.nodes;
+
+  // Build tree: group by first tag (top-level), then by parentId
+  const tagGroups = {};
+  const orphanNodes = [];
+
+  for (const node of nodes) {
+    const tag = node.tags && node.tags.length > 0 ? node.tags[0] : '其他';
+    if (!tagGroups[tag]) tagGroups[tag] = [];
+    tagGroups[tag].push(node);
+  }
+
+  let md = '# 面试知识点\n\n';
+
+  for (const [tag, groupNodes] of Object.entries(tagGroups)) {
+    md += `## ${tag}\n`;
+
+    // Find root nodes (no parentId or parentId not in this group)
+    const groupIds = new Set(groupNodes.map(n => n.id));
+    const children = {};
+    const roots = [];
+
+    for (const node of groupNodes) {
+      if (!node.parentId || !groupIds.has(node.parentId)) {
+        roots.push(node);
+      } else {
+        if (!children[node.parentId]) children[node.parentId] = [];
+        children[node.parentId].push(node);
+      }
+    }
+
+    // Recursively build markdown list
+    function renderNode(node, depth) {
+      const indent = '  '.repeat(depth);
+      let line = `${indent}- **${node.title}**`;
+      if (node.importance >= 4) line += ' ⭐';
+      line += `\n`;
+      if (node.summary) {
+        line += `${indent}  > ${node.summary.substring(0, 80)}\n`;
+      }
+      if (children[node.id]) {
+        for (const child of children[node.id]) {
+          line += renderNode(child, depth + 1);
+        }
+      }
+      return line;
+    }
+
+    for (const root of roots) {
+      md += renderNode(root, 1);
+    }
+    md += '\n';
+  }
+
+  return md;
+}
+
+let mindmapInstance = null;
+
+function renderMindMap() {
+  const container = document.getElementById('mindmap');
+  container.innerHTML = '';
+
+  const md = buildMarkdownTree();
+
+  // Use markmap-lib + markmap-view for rendering
+  const { markmap } = window;
+  if (!markmap || !markmap.Transformer || !markmap.Markmap) {
+    // Retry after a short delay if scripts haven't loaded
+    setTimeout(renderMindMap, 200);
+    return;
+  }
+
+  const { Transformer, Markmap } = markmap;
+  const transformer = new Transformer();
+  const { root } = transformer.transform(md);
+
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.style.width = '100%';
+  svg.style.height = '100%';
+  container.appendChild(svg);
+
+  mindmapInstance = Markmap.create(svg);
+  mindmapInstance.setData(root);
+  mindmapInstance.fit();
+
+  // Handle click on mindmap nodes
+  svg.addEventListener('click', (e) => {
+    const g = e.target.closest('g.markmap-node');
+    if (!g) return;
+    const textEl = g.querySelector('text');
+    if (!textEl) return;
+    const title = textEl.textContent.replace(' ⭐', '').trim();
+
+    const match = findNodeByTitle(title);
+    if (match) {
+      showDetail(match);
+      highlightGraphNode(match.id);
+    }
+  });
+}
+
+function findNodeByTitle(title) {
+  // Exact match first
+  for (const n of graphData.nodes) {
+    if (n.title === title) return n;
+  }
+  // Fuzzy match
+  for (const n of graphData.nodes) {
+    if (n.title.includes(title) || title.includes(n.title)) return n;
+  }
+  // Search aliases
+  for (const n of graphData.nodes) {
+    if (n.aliases && n.aliases.some(a => a === title || title.includes(a))) return n;
+  }
+  return null;
+}
+
+// ========== Knowledge Graph (Vis.js) ==========
+function renderGraph() {
+  const container = document.getElementById('graph');
+  container.innerHTML = '';
+
+  const edgeColors = {
+    prerequisite: { color: '#4a90d9', dashes: false },
+    contains: { color: '#27ae60', dashes: true },
+    related: { color: '#8e44ad', dashes: false },
+    compare: { color: '#e74c3c', dashes: true },
+  };
+
+  // Build vis nodes
+  const visNodes = new vis.DataSet(
+    graphData.nodes.map(n => ({
+      id: n.id,
+      label: n.title,
+      title: `<b>${n.title}</b><br>${n.summary || ''}<br><br>标签: ${(n.tags || []).join(', ')}<br>重要性: ${'★'.repeat(n.importance || 1)}`,
+      value: (n.importance || 1) * 3,
+      group: n.tags ? n.tags[0] : 'default',
+      color: {
+        background: getColorForImportance(n.importance || 1),
+        border: '#fff',
+        highlight: { background: '#ff6b6b', border: '#333' },
+      },
+      font: {
+        size: 11 + (n.importance || 1),
+        face: 'system-ui, sans-serif',
+        color: '#333',
+        strokeWidth: 2,
+        strokeColor: '#ffffff',
+      },
+    }))
+  );
+
+  // Build vis edges
+  const visEdges = new vis.DataSet(
+    edgeList.map(e => ({
+      from: e.from,
+      to: e.to,
+      label: e.description || '',
+      title: `${e.type}: ${e.description || ''}`,
+      arrows: 'to',
+      color: edgeColors[e.type] || edgeColors.related,
+      width: e.type === 'contains' ? 1.5 : 2,
+      smooth: { type: 'curvedCW', roundness: 0.2 },
+    }))
+  );
+
+  const options = {
+    physics: {
+      solver: 'forceAtlas2Based',
+      forceAtlas2Based: {
+        gravitationalConstant: -30,
+        centralGravity: 0.005,
+        springLength: 180,
+        springConstant: 0.05,
+        damping: 0.4,
+      },
+      stabilization: { iterations: 250, fit: true },
+    },
+    layout: { improvedLayout: true },
+    interaction: {
+      hover: true,
+      tooltipDelay: 200,
+      navigationButtons: true,
+      keyboard: true,
+    },
+    nodes: {
+      shape: 'dot',
+      size: 10,
+      borderWidth: 1.5,
+      shadow: { enabled: true, size: 4 },
+    },
+    edges: {
+      font: { size: 10, align: 'middle' },
+    },
+  };
+
+  network = new vis.Network(container, { nodes: visNodes, edges: visEdges }, options);
+  window.network = network;
+  window.graphData = graphData;
+  window.nodeMap = nodeMap;
+
+  // Click handler
+  network.on('click', function (params) {
+    if (params.nodes.length > 0) {
+      const nodeId = params.nodes[0];
+      const node = nodeMap[nodeId];
+      if (node) showDetail(node);
+    }
+  });
+
+  // Double click to focus
+  network.on('doubleClick', function (params) {
+    if (params.nodes.length > 0) {
+      highlightRelated(params.nodes[0]);
+    }
+  });
+
+  // Stabilize and fit
+  network.once('stabilizationIterationsDone', function () {
+    network.fit({ animation: { duration: 500 } });
+  });
+}
+
+function getColorForImportance(imp) {
+  const colors = {
+    1: '#c8d6e5',
+    2: '#a0b4cc',
+    3: '#74b9ff',
+    4: '#4a90d9',
+    5: '#e17055',
+  };
+  return colors[imp] || '#74b9ff';
+}
+
+function highlightGraphNode(nodeId) {
+  if (!network) return;
+  network.selectNodes([nodeId]);
+  network.focus(nodeId, { scale: 1.1, animation: { duration: 400 } });
+}
+
+function highlightRelated(nodeId) {
+  if (!network) return;
+  const connected = network.getConnectedNodes(nodeId);
+  network.selectNodes([nodeId, ...connected]);
+  network.focus(nodeId, { scale: 1.2, animation: { duration: 500 } });
+}
+
+// ========== Detail Panel ==========
+function showDetail(node) {
+  const panel = document.getElementById('detailPanel');
+  const content = document.getElementById('detailContent');
+  const relations = document.getElementById('detailRelations');
+
+  panel.classList.remove('collapsed');
+
+  const imp = '★'.repeat(node.importance || 1) + '☆'.repeat(5 - (node.importance || 1));
+
+  content.innerHTML = `
+    <h3>${node.title}</h3>
+    <div class="summary">${node.summary || '暂无摘要'}</div>
+    <div class="importance">${imp}</div>
+    <div class="meta">
+      <span><strong>来源:</strong> ${node.source || '未知'}</span>
+      ${node.parentId ? `<span><strong>父级:</strong> ${(nodeMap[node.parentId] || {}).title || node.parentId}</span>` : ''}
+    </div>
+    <div class="detail-tags">
+      ${(node.tags || []).map(t => `<span class="detail-tag">${t}</span>`).join('')}
+    </div>
+  `;
+
+  // Show related connections
+  const relatedEdges = edgeList.filter(e => e.from === node.id || e.to === node.id);
+  const typeLabels = {
+    prerequisite: '前置',
+    contains: '包含',
+    related: '相关',
+    compare: '对比',
+  };
+
+  relations.innerHTML = `<h4>关联关系 (${relatedEdges.length})</h4>`;
+  if (relatedEdges.length === 0) {
+    relations.innerHTML += '<div style="color:#aaa;font-size:13px">暂无关联</div>';
+  } else {
+    relatedEdges.forEach(e => {
+      const targetId = e.from === node.id ? e.to : e.from;
+      const targetNode = nodeMap[targetId];
+      const dir = e.from === node.id ? '→' : '←';
+      relations.innerHTML += `
+        <div class="relation-item" onclick="jumpToNode('${targetId}')" title="${e.description || ''}">
+          <span class="relation-type rel-${e.type}">${typeLabels[e.type] || e.type}</span>
+          ${dir} ${targetNode ? targetNode.title : targetId}
+        </div>
+      `;
+    });
+  }
+}
+
+function jumpToNode(nodeId) {
+  const node = nodeMap[nodeId];
+  if (node) {
+    showDetail(node);
+    highlightGraphNode(nodeId);
+  }
+}
+
+// ========== Search ==========
+const searchInput = document.getElementById('searchInput');
+let searchTimeout;
+
+searchInput.addEventListener('input', function () {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    const query = this.value.trim().toLowerCase();
+    if (!query) {
+      if (network) {
+        network.selectNodes([]);
+        network.fit({ animation: { duration: 300 } });
+      }
+      return;
+    }
+
+    // Find matching nodes
+    const matched = graphData.nodes.filter(n =>
+      n.title.toLowerCase().includes(query) ||
+      (n.summary || '').toLowerCase().includes(query) ||
+      (n.tags || []).some(t => t.toLowerCase().includes(query)) ||
+      (n.aliases || []).some(a => a.toLowerCase().includes(query))
+    );
+
+    if (network && matched.length > 0) {
+      const nodeIds = matched.map(n => n.id);
+      network.selectNodes(nodeIds);
+      network.focus(nodeIds[0], { scale: 1.0, animation: { duration: 300 } });
+    }
+  }, 250);
+});
+
+// ========== Resizer ==========
+const resizer = document.getElementById('resizer');
+const leftPanel = document.getElementById('leftPanel');
+let resizing = false;
+
+resizer.addEventListener('mousedown', (e) => {
+  resizing = true;
+  resizer.classList.add('active');
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!resizing) return;
+  const newWidth = Math.max(250, Math.min(600, e.clientX));
+  leftPanel.style.width = newWidth + 'px';
+});
+
+document.addEventListener('mouseup', () => {
+  if (resizing) {
+    resizing = false;
+    resizer.classList.remove('active');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    // Trigger resize for both visualizations
+    if (network) network.redraw();
+    window.dispatchEvent(new Event('resize'));
+  }
+});
+
+// ========== Keyboard shortcuts ==========
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    document.getElementById('detailPanel').classList.add('collapsed');
+    if (network) network.selectNodes([]);
+    searchInput.value = '';
+  }
+  if (e.key === 'f' && e.ctrlKey) {
+    e.preventDefault();
+    searchInput.focus();
+  }
+});
+
+// ========== Init ==========
+loadData();
+</script>
+</body>
+</html>
